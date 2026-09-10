@@ -1,0 +1,29 @@
+{
+  "name": "serial-tracker-backend",
+  "version": "1.0.0",
+  "description": "a web application that helps users track TV series they watch, manage watch progress, and receive notifications about new episodes",
+  "homepage": "https://github.com/uat2-002/backend#readme",
+  "bugs": {
+    "url": "https://github.com/uat2-002/backend/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/uat2-002/backend.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^22.20.2",
+    "tsx": "^4.23.13",
+    "typescript": "^7.0.2"
+  }
+}
