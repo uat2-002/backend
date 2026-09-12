@@ -6,3 +6,61 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum seriesStatus {
+  ongoing
+  ended
+  cenceled
+}
+
+enum userWatchStatus {
+  plan_to_watch
+  watching
+  watched
+  not_worth_it
+}
+
+model User {
+  id Int @id @default(autoincrement())
+
+  email        String @unique
+  passwordHash String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users UserSeries[]
+}
+
+model Series {
+  id Int @id @default(autoincrement())
+
+  title       String
+  poster      String
+  genres      String[]
+  overview    String
+  status      seriesStatus
+  releaseDate DateTime
+  rating      Int?
+
+  series UserSeries[]
+}
+
+model UserSeries {
+  userId   Int
+  seriesId Int
+
+  status userWatchStatus
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  series Series @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+
+  @@id([userId, seriesId])
+}
+
+// good to use:
+// Prisma Extension
+// npx prisma format
