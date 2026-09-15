@@ -13,3 +13,5 @@ npm-debug.log*
 
 *.tsbuildinfo
 /src/generated/prisma
+
+prisma/migrations
