@@ -1,0 +1,25 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  email String @id
+
+  passwordHash String
+
+  series UserSeries[]
+}
+
+model UserSeries {
+  userEmail String
+  tmdbId    Int             //for TMDB get
+
+  user User @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+
+  @@id([userEmail, tmdbId])
+}
