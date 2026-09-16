@@ -1,6 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 
+import { moviesHandler } from './movies.js';
+
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
@@ -18,6 +20,8 @@ app.use((_request, response, next) => {
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok', service: 'serial-tracker-backend' });
 });
+
+app.get('/api/movies', moviesHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
