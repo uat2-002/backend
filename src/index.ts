@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
-
+import { authRouter } from './auth/auth.controller.js';
+import { errorHandler } from './middleware/error-handler.js';
 import { moviesHandler } from './parser/movies.js';
-
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
@@ -17,11 +17,15 @@ app.use((_request, response, next) => {
   next();
 });
 
+app.use('/api', authRouter);
+
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok', service: 'serial-tracker-backend' });
 });
 
 app.get('/api/movies', moviesHandler);
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
