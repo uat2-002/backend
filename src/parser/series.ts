@@ -44,8 +44,8 @@ function saveCache(entry: CacheEntry): void {
   try {
     mkdirSync(path.dirname(CACHE_FILE), { recursive: true });
     writeFileSync(CACHE_FILE, JSON.stringify(entry));
-  } catch {
-    // empty
+  } catch (error) {
+    console.error('Failed to write series cache:', error);
   }
 }
 
