@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import { authRouter } from './auth/auth.controller.js';
 import { errorHandler } from './middleware/error-handler.js';
-import { moviesHandler } from './parser/movies.js';
+import { seriesHandler } from './parser/series.js';
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
@@ -23,7 +23,7 @@ app.get('/health', (_request, response) => {
   response.json({ status: 'ok', service: 'serial-tracker-backend' });
 });
 
-app.get('/api/movies', moviesHandler);
+app.get('/api/series', seriesHandler);
 
 app.use(errorHandler);
 
