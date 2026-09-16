@@ -6,7 +6,8 @@ export function validate(schema: ZodType): RequestHandler {
   return (req, _res, next) => {
     const result = schema.safeParse(req.body);
     if (!result.success) {
-      throw new HttpError(400, result.error.message);
+      const message = result.error.issues.map((i) => i.message).join(', ');
+      throw new HttpError(400, message);
     }
     req.body = result.data;
     next();
