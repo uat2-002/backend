@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 
-import { moviesHandler } from './movies.js';
+import { moviesHandler } from './parser/movies.js';
 
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
