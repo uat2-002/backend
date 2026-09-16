@@ -1,9 +1,23 @@
+import 'dotenv/config';
 import express from 'express';
 
+const PORT = process.env.PORT;
+const FRONTEND_URL = process.env.FRONTEND_URL;
+
 const app = express();
-const PORT = process.env.PORT ?? 3000;
 
 app.use(express.json());
+
+app.use((_request, response, next) => {
+  response.header('Access-Control-Allow-Origin', FRONTEND_URL);
+  response.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+  response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  next();
+});
+
+app.get('/health', (_request, response) => {
+  response.json({ status: 'ok', service: 'serial-tracker-backend' });
+});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
