@@ -1,9 +1,11 @@
 import bcrypt from 'bcryptjs';
-import { findUserByEmail, createUser } from './auth.repository.js';
+import { findUserByEmail, createUser,updateRefreshToken } from './auth.repository.js';
 import { HttpError } from '../errors/http-error.js';
 import jwt from 'jsonwebtoken';
 
 const SALT_ROUNDS = 10;
+const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET as string;
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET as string;
 
 export async function registerUser(email: string, password: string) {
   const existing = await findUserByEmail(email);
@@ -24,8 +26,31 @@ export async function loginUser(email: string, password: string) {
     if (!passwordMatch) {
       throw new HttpError(401, 'Authentication failed');
     }
-    const accessToken = jwt.sign({ userId: user.email}, 'your-secret-key', {
- expiresIn: '24h',
-    });
-  return { accessToken };
+    const accessToken = jwt.sign({ userId: user.email }, ACCESS_SECRET, { expiresIn: '15m' });
+    const refreshToken = jwt.sign({ userId: user.email }, REFRESH_SECRET, { expiresIn: '7d' });
+    await updateRefreshToken(user.email, refreshToken);
+  return { accessToken, refreshToken };
+}
+
+export async function refreshSession(clientRefreshToken: string) { 
+  try {
+    const decoded = jwt.verify(clientRefreshToken, REFRESH_SECRET);
+    const userEmail = (decoded as any).userId;
+
+    const user = await findUserByEmail(userEmail);
+
+    if (!user || user.refreshToken !== clientRefreshToken) {
+      throw new HttpError(401, 'Invalid refresh token');
+    }
+
+    const newAccessToken = jwt.sign({ userId: user.email }, ACCESS_SECRET, { expiresIn: '15m' });
+    
+    return { accessToken: newAccessToken };
+  } catch (error) {
+    throw new HttpError(401, 'Invalid refresh token');
+  }
+}
+
+export async function logoutUser(userEmail: string) {
+  await updateRefreshToken(userEmail, null);
 }
