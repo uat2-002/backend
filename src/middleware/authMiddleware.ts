@@ -1,7 +1,21 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { HttpError } from '../errors/http-error.js';
+import type { Request, Response, NextFunction } from 'express';
 
-export function verifyToken(req, res, next) {
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      userId?: string; 
+    }
+  }
+}
+
+interface TokenPayload extends JwtPayload {
+  userId: string;
+}
+
+export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -14,10 +28,10 @@ export function verifyToken(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string);
-    (req as any).userId = (decoded as any).userId; 
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as TokenPayload;
+    req.userId = decoded.userId; 
     next();
-  } catch (error) {
+  } catch  {
     return next(new HttpError(401, 'Invalid token'));
   }
 }
