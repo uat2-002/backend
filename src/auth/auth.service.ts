@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { findUserByEmail, createUser,updateRefreshToken } from './auth.repository.js';
 import { HttpError } from '../errors/http-error.js';
 import jwt from 'jsonwebtoken';
+import { type TokenPayload} from '../types/custom.js'
 
 const SALT_ROUNDS = 10;
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET as string;
@@ -34,8 +35,8 @@ export async function loginUser(email: string, password: string) {
 
 export async function refreshSession(clientRefreshToken: string) { 
   try {
-    const decoded = jwt.verify(clientRefreshToken, REFRESH_SECRET);
-    const userEmail = (decoded as any).userId;
+    const decoded = jwt.verify(clientRefreshToken, REFRESH_SECRET) as TokenPayload;
+    const userEmail = decoded.userId;
 
     const user = await findUserByEmail(userEmail);
 
@@ -46,7 +47,7 @@ export async function refreshSession(clientRefreshToken: string) {
     const newAccessToken = jwt.sign({ userId: user.email }, ACCESS_SECRET, { expiresIn: '15m' });
     
     return { accessToken: newAccessToken };
-  } catch (error) {
+  } catch {
     throw new HttpError(401, 'Invalid refresh token');
   }
 }

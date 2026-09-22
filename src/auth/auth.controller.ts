@@ -40,8 +40,12 @@ authRouter.post('/refresh', async (req, res, next) => {
 
 authRouter.post('/logout', verifyToken, async (req, res, next) => {
   try {
-    const userEmail = (req as any).userId;
+    const userEmail = req.userId;
     
+    if (!userEmail) {
+      throw new HttpError(401, 'Unauthorized');
+    }
+
     await logoutUser(userEmail);
     
     res.status(200).json({ message: 'Logged out successfully' });

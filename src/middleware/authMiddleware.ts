@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { HttpError } from '../errors/http-error.js';
 import type { Request, Response, NextFunction } from 'express';
+import { type TokenPayload } from '../types/custom.js'
 
 export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.header('Authorization');
@@ -15,10 +16,10 @@ export function verifyToken(req: Request, res: Response, next: NextFunction) {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string);
-    (req as any).userId = (decoded as any).userId; 
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as TokenPayload;
+    req.userId = decoded.userId; 
     next();
-  } catch (error) {
+  } catch  {
     return next(new HttpError(401, 'Invalid token'));
   }
 }
