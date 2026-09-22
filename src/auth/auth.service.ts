@@ -1,8 +1,11 @@
 import bcrypt from 'bcryptjs';
 import { findUserByEmail, createUser,updateRefreshToken } from './auth.repository.js';
 import { HttpError } from '../errors/http-error.js';
-import jwt from 'jsonwebtoken';
-import { type TokenPayload} from '../types/custom.js'
+import jwt,  { type JwtPayload} from 'jsonwebtoken';
+
+interface TokenPayload extends JwtPayload {
+  userId: string;
+}
 
 const SALT_ROUNDS = 10;
 const ACCESS_SECRET = process.env.JWT_ACCESS_SECRET as string;

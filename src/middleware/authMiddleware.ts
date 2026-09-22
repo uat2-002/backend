@@ -1,7 +1,19 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { HttpError } from '../errors/http-error.js';
 import type { Request, Response, NextFunction } from 'express';
-import { type TokenPayload } from '../types/custom.js'
+
+declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
+  namespace Express {
+    interface Request {
+      userId?: string; 
+    }
+  }
+}
+
+interface TokenPayload extends JwtPayload {
+  userId: string;
+}
 
 export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.header('Authorization');
