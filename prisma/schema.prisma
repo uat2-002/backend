@@ -7,19 +7,47 @@ datasource db {
   provider = "postgresql"
 }
 
+enum SeriesStatus {
+  ongoing
+  ended
+  canceled
+}
+
+enum UserSeriesStatus {
+  plan_to_watch
+  watching
+  watched
+  not_worth_it
+}
+
 model User {
   email String @id
 
   passwordHash String
+  refreshToken String?
 
   series UserSeries[]
 }
 
+model Series {
+  tmdbId Int @id
+
+  title  String
+  poster String?
+  status SeriesStatus
+
+  metadata Json?
+  users    UserSeries[]
+}
+
 model UserSeries {
-  userEmail String
-  tmdbId    Int             //for TMDB get
+  userEmail  String
+  seriesId   Int
+  userStatus UserSeriesStatus @default(plan_to_watch)
+  dateAdded  DateTime         @default(now())
 
-  user User @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  user   User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  series Series @relation(fields: [seriesId], references: [tmdbId], onDelete: Cascade)
 
-  @@id([userEmail, tmdbId])
+  @@id([userEmail, seriesId])
 }
