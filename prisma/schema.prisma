@@ -24,6 +24,7 @@ model User {
   email String @id
 
   passwordHash String
+  refreshToken String?
 
   series UserSeries[]
 }

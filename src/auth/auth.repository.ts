@@ -12,3 +12,10 @@ export async function createUser(email: string, passwordHash: string) {
     select: { email: true },
   });
 }
+
+export async function updateRefreshToken(email: string, token: string|null) {
+  return prisma.user.update({
+    where: { email },
+    data: {refreshToken: token}
+  });
+ };
