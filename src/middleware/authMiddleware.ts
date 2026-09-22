@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { HttpError } from '../errors/http-error.js';
+import type { Request, Response, NextFunction } from 'express';
 
-export function verifyToken(req, res, next) {
+export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.header('Authorization');
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
