@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import { authRouter } from './auth/auth.controller.js';
 import { errorHandler } from './middleware/error-handler.js';
+import { watchlistRouter } from './watchlist/watchlist.controller.js';
 import { verifyToken } from './middleware/authMiddleware.js';
 
 const PORT = process.env.PORT;
@@ -18,6 +19,7 @@ app.use(
 app.use(express.json());
 
 app.use('/api', authRouter);
+app.use('/user',watchlistRouter)
 app.get('/api/me', verifyToken, (req, res) => {
   res.json({ message: 'Authorized access', userEmail: (req as any).userId });
 });
