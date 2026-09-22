@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cors from 'cors';
 import { authRouter } from './auth/auth.controller.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { watchlistRouter } from './watchlist/watchlist.controller.js';
@@ -10,14 +11,12 @@ const FRONTEND_URL = process.env.FRONTEND_URL;
 
 const app = express();
 
+app.use(
+  cors({
+    origin: FRONTEND_URL,
+  }),
+);
 app.use(express.json());
-
-app.use((_request, response, next) => {
-  response.header('Access-Control-Allow-Origin', FRONTEND_URL);
-  response.header('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-  response.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  next();
-});
 
 app.use('/api', authRouter);
 app.use('/user',watchlistRouter)
