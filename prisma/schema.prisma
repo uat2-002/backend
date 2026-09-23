@@ -26,28 +26,73 @@ model User {
   passwordHash String
   refreshToken String?
 
-  series UserSeries[]
+  series       UserSeries[]
+  userEpisodes UserEpisode[]
 }
 
 model Series {
-  tmdbId Int @id
+  tmdbId           Int          @id
+  title            String
+  poster           String?
+  backdrop         String?
+  overview         String?
+  firstAirDate     DateTime?
+  numberOfSeasons  Int?
+  numberOfEpisodes Int?
+  status           SeriesStatus
 
-  title  String
-  poster String?
-  status SeriesStatus
-
-  metadata Json?
   users    UserSeries[]
+  seasons  Season[]
+  episodes Episode[]
 }
 
 model UserSeries {
-  userEmail  String
-  seriesId   Int
-  userStatus UserSeriesStatus @default(plan_to_watch)
-  dateAdded  DateTime         @default(now())
+  userEmail            String
+  seriesId             Int
+  userStatus           UserSeriesStatus @default(plan_to_watch)
+  dateAdded            DateTime         @default(now())
+  watchedEpisodesCount Int              @default(0)
 
   user   User   @relation(fields: [userEmail], references: [email], onDelete: Cascade)
   series Series @relation(fields: [seriesId], references: [tmdbId], onDelete: Cascade)
 
   @@id([userEmail, seriesId])
+}
+
+model Season {
+  tmdbId       Int     @id
+  seriesId     Int
+  seasonNumber Int
+  name         String
+  overview     String?
+  poster       String?
+
+  series   Series    @relation(fields: [seriesId], references: [tmdbId], onDelete: Cascade)
+  episodes Episode[]
+}
+
+model Episode {
+  tmdbId       Int       @id
+  seriesId     Int
+  seasonId     Int
+  seasonNumber Int
+  episodeNum   Int
+  title        String
+  overview     String?
+  stillPath    String?
+  airDate      DateTime?
+
+  series    Series        @relation(fields: [seriesId], references: [tmdbId], onDelete: Cascade)
+  season    Season        @relation(fields: [seasonId], references: [tmdbId], onDelete: Cascade)
+  watchedBy UserEpisode[]
+}
+
+model UserEpisode {
+  userEmail String
+  episodeId Int
+
+  user    User    @relation(fields: [userEmail], references: [email], onDelete: Cascade)
+  episode Episode @relation(fields: [episodeId], references: [tmdbId], onDelete: Cascade)
+
+  @@id([userEmail, episodeId])
 }
