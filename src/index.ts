@@ -5,7 +5,7 @@ import { authRouter } from './auth/auth.controller.js';
 import { errorHandler } from './middleware/error-handler.js';
 import { watchlistRouter } from './watchlist/watchlist.controller.js';
 import { verifyToken } from './middleware/authMiddleware.js';
-
+import { seriesHandler } from './parser/series.js';
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
@@ -26,6 +26,8 @@ app.get('/api/me', verifyToken, (req, res) => {
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok', service: 'serial-tracker-backend' });
 });
+
+app.get('/api/series', seriesHandler);
 
 app.use(errorHandler);
 

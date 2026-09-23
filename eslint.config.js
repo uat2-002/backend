@@ -21,6 +21,7 @@ export default defineConfig([
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      "@typescript-eslint/no-explicit-any": "error",
     },
   },
   prettier,
