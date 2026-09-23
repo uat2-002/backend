@@ -1,13 +1,9 @@
-import jwt from 'jsonwebtoken';
+import type { NextFunction, Request, Response } from 'express';
+import jwt, { type JwtPayload } from 'jsonwebtoken';
 import { HttpError } from '../errors/http-error.js';
-import type { Request, Response, NextFunction } from 'express';
 
-interface JwtPayload {
-  userId: string;
-  iat?: number;
-  exp?: number;
-}
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Request {
       userId?: string;
@@ -15,28 +11,11 @@ declare global {
   }
 }
 
-// export function verifyToken(req: Request, res: Response, next: NextFunction) {
-//   const authHeader = req.header('Authorization');
+interface TokenPayload extends JwtPayload {
+  userId: string;
+}
 
-//   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-//     return next(new HttpError(401, 'Access denied'));
-//   }
-
-//   const token = authHeader.split(' ')[1];
-//   if (!token) {
-//     return next(new HttpError(401, 'Access denied'));
-//   }
-
-//   try {
-//     const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string);
-//     req.params.userId = decoded.userId;
-//     next();
-//   } catch (error) {
-//     return next(new HttpError(401, 'Invalid token'));
-//   }
-// }
-
-export function verifyToken(req: Request, res: Response, next: NextFunction): void {
+export function verifyToken(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.header('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return next(new HttpError(401, 'Access denied'));
@@ -46,10 +25,10 @@ export function verifyToken(req: Request, res: Response, next: NextFunction): vo
     return next(new HttpError(401, 'Access denied'));
   }
   try {
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as JwtPayload;
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET as string) as TokenPayload;
     req.userId = decoded.userId;
     next();
-  } catch (error) {
+  } catch {
     return next(new HttpError(401, 'Invalid token'));
   }
 }

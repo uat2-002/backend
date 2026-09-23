@@ -21,7 +21,7 @@ app.use(express.json());
 app.use('/api', authRouter);
 app.use('/user',watchlistRouter)
 app.get('/api/me', verifyToken, (req, res) => {
-  res.json({ message: 'Authorized access', userEmail: (req as any).userId });
+  res.json({ message: 'Authorized access', userEmail: req.userId });
 });
 app.get('/health', (_request, response) => {
   response.json({ status: 'ok', service: 'serial-tracker-backend' });
