@@ -6,6 +6,8 @@ import { errorHandler } from './middleware/error-handler.js';
 import { watchlistRouter } from './watchlist/watchlist.controller.js';
 import { verifyToken } from './middleware/authMiddleware.js';
 import { seriesHandler } from './parser/series.js';
+import { searchRouter } from './search/search.controller.js';
+
 const PORT = process.env.PORT;
 const FRONTEND_URL = process.env.FRONTEND_URL;
 
@@ -28,6 +30,8 @@ app.get('/health', (_request, response) => {
 });
 
 app.get('/api/series', seriesHandler);
+
+app.use('/api/search', searchRouter);
 
 app.use(errorHandler);
 
