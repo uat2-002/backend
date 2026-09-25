@@ -6,20 +6,16 @@ import { getSeries, parseMaxAge } from '../parser/series.js';
 
 export const seriesRouter = Router();
 
-seriesRouter.get(
-  '/series/:id',
-  validate(SeriesDetailsResponseSchema),
-  async (req: Request, res: Response) => {
-    if (req.params.id) {
-      const seriesId = Number(req.params.id);
+seriesRouter.get('/series/:id', async (req: Request, res: Response) => {
+  if (req.params.id) {
+    const seriesId = Number(req.params.id);
 
-      let seriesDetails = await getOrSyncSeries(seriesId);
+    let seriesDetails = await getOrSyncSeries(seriesId);
 
-      const seriesPayload = makeSeriesPayload(seriesDetails);
-      res.status(200).json(seriesPayload);
-    }
+    const seriesPayload = makeSeriesPayload(seriesDetails);
+    res.status(200).json(seriesPayload);
   }
-);
+});
 
 // TODO:
 // 1. Need to provide Zod Schemas for this route instead of interfaces
