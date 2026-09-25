@@ -77,7 +77,6 @@ export const TmdbSeasonWithEpisodesSchema = TmdbSeasonSchema.extend({
   episodes: z.array(TmdbEpisodeSchema),
 });
 
-// Update your export type at the bottom:
 export type TmdbSeasonWithEpisodesSchema = z.infer<typeof TmdbSeasonWithEpisodesSchema>;
 
 export const TmdbSeriesSchema = z.object({

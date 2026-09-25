@@ -57,7 +57,6 @@ export const getOrSyncSeasonEpisodes = async (
   let seasonWithEpisodes = await findSeasonDetails(seriesId, seasonNumber);
   if (seasonWithEpisodes && seasonWithEpisodes.episodes.length > 0) return seasonWithEpisodes;
 
-  // Ensure series and seasons exist before adding episodes
   await getOrSyncSeries(seriesId);
 
   const rawTmdbSeason = await fetchSeasonDetails(seriesId, seasonNumber);
