@@ -32,3 +32,7 @@ export const SeriesDetailsResponseSchema = z.object({
   status: z.enum(['ongoing', 'ended', 'canceled']),
   seasons: z.array(SeasonResponseSchema),
 });
+
+export type SeriesDetailsResponseSchema = z.infer<typeof SeriesDetailsResponseSchema>;
+export type EpisodeResponseSchema = z.infer<typeof EpisodeResponseSchema>;
+export type SeasonResponseSchema = z.infer<typeof SeasonResponseSchema>;
