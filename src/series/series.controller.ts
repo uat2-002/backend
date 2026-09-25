@@ -28,7 +28,7 @@ seriesRouter.get('/series/:id', async (req: Request, res: Response) => {
   if (req.params.id) {
     const seriesId = Number(req.params.id);
 
-    let seriesDetails = await getOrSyncSeries(seriesId);
+    const seriesDetails = await getOrSyncSeries(seriesId);
 
     const seriesPayload = makeSeriesPayload(seriesDetails);
     res.status(200).json(seriesPayload);
