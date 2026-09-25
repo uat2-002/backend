@@ -1,9 +1,20 @@
-import { fetchSeriesDetails } from '../parser/seriesDetails.js';
-import { TmdbSeriesSchema, SeriesDetailsResponseSchema } from './series.schema.js';
-import type { Series, Season } from '../generated/prisma/client.js';
-import { findSeriesDetails, createSeries } from './series.repository.js';
+import { fetchSeasonDetails, fetchSeriesDetails } from '../parser/seriesDetails.js';
+import {
+  TmdbSeriesSchema,
+  SeriesDetailsResponseSchema,
+  TmdbSeasonWithEpisodesSchema,
+} from './series.schema.js';
+import type { Series, Season, Episode } from '../generated/prisma/client.js';
+import {
+  findSeriesDetails,
+  createSeries,
+  findSeasonDetails,
+  createSeasonWithEpisodes,
+} from './series.repository.js';
+import { HttpError } from '../errors/http-error.js';
 
 type SeriesWithSeasons = Series & { seasons: Season[] };
+type SeasonWithEpisodes = Season & { episodes: Episode[] };
 
 export const getOrSyncSeries = async (seriesId: number): Promise<SeriesWithSeasons> => {
   let series = await findSeriesDetails(seriesId);
@@ -37,4 +48,46 @@ export const makeSeriesPayload = (seriesDetails: SeriesWithSeasons) => {
     })),
   };
   return SeriesDetailsResponseSchema.parse(seriesPayload);
+};
+
+export const getOrSyncSeasonEpisodes = async (
+  seriesId: number,
+  seasonNumber: number
+): Promise<SeasonWithEpisodes> => {
+  let seasonWithEpisodes = await findSeasonDetails(seriesId, seasonNumber);
+  if (seasonWithEpisodes && seasonWithEpisodes.episodes.length > 0) return seasonWithEpisodes;
+
+  // Ensure series and seasons exist before adding episodes
+  await getOrSyncSeries(seriesId);
+
+  const rawTmdbSeason = await fetchSeasonDetails(seriesId, seasonNumber);
+  const parsedSeason = TmdbSeasonWithEpisodesSchema.parse(rawTmdbSeason);
+
+  await createSeasonWithEpisodes(parsedSeason, seriesId);
+  seasonWithEpisodes = await findSeasonDetails(seriesId, seasonNumber);
+  if (!seasonWithEpisodes) {
+    throw new HttpError(404, 'User or Series not found in database');
+  }
+
+  return seasonWithEpisodes;
+};
+
+export const makeSeasonWithEpisodesPayload = (seasonWithEpisodes: SeasonWithEpisodes) => {
+  const seasonWithEpisodesPayload = {
+    tmdbId: seasonWithEpisodes.tmdbId,
+    seasonNumber: seasonWithEpisodes.seasonNumber,
+    name: seasonWithEpisodes.name,
+    overview: seasonWithEpisodes.overview,
+    poster: seasonWithEpisodes.poster,
+    episodes: seasonWithEpisodes.episodes.map(episode => ({
+      tmdbId: episode.tmdbId,
+      seasonNumber: episode.seasonNumber,
+      episodeNumber: episode.episodeNum,
+      title: episode.title,
+      overview: episode.overview,
+      stillPath: episode.stillPath,
+      airDate: episode.airDate ? episode.airDate.toISOString() : null,
+    })),
+  };
+  return seasonWithEpisodesPayload;
 };

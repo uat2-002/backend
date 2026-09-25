@@ -54,14 +54,31 @@ export const SeasonEpisodesResponseSchema = z.object({
 export type SeriesDetailsResponse = z.infer<typeof SeriesDetailsResponseSchema>;
 export type SeasonEpisodesResponse = z.infer<typeof SeasonEpisodesResponseSchema>;
 
+export const TmdbEpisodeSchema = z.object({
+  id: z.number(),
+  season_number: z.number(),
+  episode_number: z.number(),
+  name: z.string(),
+  overview: z.string().nullable().optional(),
+  still_path: z.string().nullable().optional(),
+  air_date: z.string().nullable().optional(),
+});
+
 export const TmdbSeasonSchema = z.object({
   id: z.number(),
   season_number: z.number(),
   name: z.string(),
   overview: z.string().nullable().optional(),
   poster_path: z.string().nullable().optional(),
-  episode_count: z.number(),
+  episode_count: z.number().optional(),
 });
+
+export const TmdbSeasonWithEpisodesSchema = TmdbSeasonSchema.extend({
+  episodes: z.array(TmdbEpisodeSchema),
+});
+
+// Update your export type at the bottom:
+export type TmdbSeasonWithEpisodesSchema = z.infer<typeof TmdbSeasonWithEpisodesSchema>;
 
 export const TmdbSeriesSchema = z.object({
   id: z.number(),
@@ -74,16 +91,6 @@ export const TmdbSeriesSchema = z.object({
   number_of_episodes: z.number().optional(),
   status: z.string(),
   seasons: z.array(TmdbSeasonSchema),
-});
-
-export const TmdbEpisodeSchema = z.object({
-  id: z.number(),
-  season_number: z.number(),
-  episode_number: z.number(),
-  name: z.string(),
-  overview: z.string().nullable().optional(),
-  still_path: z.string().nullable().optional(),
-  air_date: z.string().nullable().optional(),
 });
 
 export type TmdbSeriesResponseSchema = z.infer<typeof TmdbSeriesSchema>;

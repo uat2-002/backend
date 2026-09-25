@@ -1,6 +1,6 @@
 import { prisma } from '../prisma-client.js';
 import { mapTmdbStatus } from '../parser/tmdb-helpers.js';
-import type { TmdbSeriesResponseSchema } from './series.schema.js';
+import type { TmdbSeriesResponseSchema, TmdbSeasonWithEpisodesSchema } from './series.schema.js';
 
 export const findSeriesDetails = async (seriesId: number) => {
   const series = await prisma.series.findUnique({
@@ -16,6 +16,22 @@ export const findSeriesDetails = async (seriesId: number) => {
     },
   });
   return series;
+};
+export const findSeasonDetails = async (seriesId: number, seasonNumber: number) => {
+  const season = await prisma.season.findFirst({
+    where: {
+      seriesId: seriesId,
+      seasonNumber: seasonNumber,
+    },
+    include: {
+      episodes: {
+        orderBy: {
+          episodeNum: 'asc',
+        },
+      },
+    },
+  });
+  return season;
 };
 
 export const createSeries = async (parsedSeries: TmdbSeriesResponseSchema) => {
@@ -50,5 +66,25 @@ export const createSeries = async (parsedSeries: TmdbSeriesResponseSchema) => {
         },
       },
     },
+  });
+};
+
+export const createSeasonWithEpisodes = async (
+  parsedSeason: TmdbSeasonWithEpisodesSchema,
+  seriesId: number
+) => {
+  return await prisma.episode.createMany({
+    data: parsedSeason.episodes.map(ep => ({
+      tmdbId: ep.id,
+      seriesId: seriesId,
+      seasonId: parsedSeason.id,
+      seasonNumber: parsedSeason.season_number,
+      episodeNum: ep.episode_number,
+      title: ep.name,
+      overview: ep.overview,
+      stillPath: ep.still_path,
+      airDate: ep.air_date ? new Date(ep.air_date) : null,
+    })),
+    skipDuplicates: true,
   });
 };
