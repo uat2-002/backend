@@ -45,3 +45,4 @@ seriesRouter.get('/series/:id/season/:seasonNumber', async (req: Request, res: R
     res.status(200).json(seasonWithEpisodesPayload);
   }
 });
+// implement episodes progress
