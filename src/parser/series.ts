@@ -1,8 +1,6 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-import type { Request, Response } from 'express';
-
 const TMDB_BASE_URL = 'https://api.themoviedb.org/3';
 const DEFAULT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 const CACHE_FILE = path.join(import.meta.dirname, '..', '.cache', 'series-cache.json');
@@ -51,7 +49,7 @@ function saveCache(entry: CacheEntry): void {
 
 let cache = loadCache();
 
-function parseMaxAge(raw: unknown): number {
+export function parseMaxAge(raw: unknown): number {
   const match = typeof raw === 'string' ? /^(\d+)(h|m|d)?$/.exec(raw.trim()) : null;
   if (!match) return DEFAULT_MAX_AGE_MS;
   const value = Number(match[1]);
@@ -71,7 +69,7 @@ async function fetchPopularSeries(): Promise<Series[]> {
     throw new Error(`TMDb request failed: ${response.status} ${response.statusText}`);
   }
   const body = (await response.json()) as { results: TmdbSeries[] };
-  return body.results.map((series) => ({
+  return body.results.map(series => ({
     id: series.id,
     title: series.name,
     poster: series.poster_path,
@@ -82,7 +80,7 @@ async function fetchPopularSeries(): Promise<Series[]> {
   }));
 }
 
-async function getSeries(maxAgeMs: number): Promise<Series[]> {
+export async function getSeries(maxAgeMs: number): Promise<Series[]> {
   const cached = cache;
   if (cached && Date.now() - cached.fetchedAt < maxAgeMs) {
     return cached.data;
@@ -91,13 +89,4 @@ async function getSeries(maxAgeMs: number): Promise<Series[]> {
   cache = { data, fetchedAt: Date.now() };
   saveCache(cache);
   return data;
-}
-
-export async function seriesHandler(request: Request, response: Response): Promise<void> {
-  const maxAgeMs = parseMaxAge(request.query.maxAge);
-  try {
-    response.json(await getSeries(maxAgeMs));
-  } catch (error) {
-    response.status(502).json({ error: 'Failed to fetch series from TMDb', details: (error as Error).message });
-  }
 }
