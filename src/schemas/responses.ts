@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 export const EpisodeResponseSchema = z.object({
-  tmdbId: z.number(),
+  tmdb_id: z.number(),
   seasonNumber: z.number(),
   episodeNum: z.number(),
   title: z.string(),
@@ -12,7 +12,7 @@ export const EpisodeResponseSchema = z.object({
 });
 
 export const SeasonResponseSchema = z.object({
-  tmdbId: z.number(),
+  tmdb_id: z.number(),
   seasonNumber: z.number(),
   name: z.string(),
   overview: z.string().nullable(),
@@ -21,14 +21,14 @@ export const SeasonResponseSchema = z.object({
 });
 
 export const SeriesDetailsResponseSchema = z.object({
-  tmdbId: z.number(),
+  tmdb_id: z.number(),
   title: z.string(),
   poster: z.string().nullable(),
   backdrop: z.string().nullable(),
   overview: z.string().nullable(),
-  firstAirDate: z.string().nullable(),
-  numberOfSeasons: z.number().nullable(),
-  numberOfEpisodes: z.number().nullable(),
+  first_air_date: z.string().nullable(),
+  number_of_seasons: z.number().nullable(),
+  number_of_episodes: z.number().nullable(),
   status: z.enum(['ongoing', 'ended', 'canceled']),
   seasons: z.array(SeasonResponseSchema),
 });

@@ -13,12 +13,12 @@ export const TmdbEpisodeSchema = z.object({
 export const TmdbSeriesSchema = z.object({
   id: z.number(),
   title: z.string(),
-  posterPath: z.string().optional(),
-  backdropPath: z.string().optional(),
+  poster_path: z.string().optional(),
+  backdrop_path: z.string().optional(),
   overview: z.string().optional(),
-  firstAirDate: z.string().optional(),
-  numberOfSeasons: z.number().optional(),
-  numberOfEpisodes: z.number().optional(),
+  first_air_date: z.string().optional(),
+  number_of_seasons: z.number().optional(),
+  number_of_episodes: z.number().optional(),
   status: z.string(),
 });
 export type TmdbSeriesResponseSchema = z.infer<typeof TmdbSeriesSchema>;
