@@ -1,25 +1,43 @@
 import { Router } from 'express';
-import { addSeriesSchema } from './watchlist.schema.js';
-import { addSeries } from './watchlist.service.js';
+import { addSeriesSchema, updateUserStatusSchema } from './watchlist.schema.js';
+import { addSeries, updateUserStatus } from './watchlist.service.js';
 import { validate } from '../middleware/validate.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { HttpError } from '../errors/http-error.js';
 
 export const watchlistRouter = Router();
-watchlistRouter.post('/series', verifyToken, validate(addSeriesSchema), async (req, res, next) => {
-    try {
-        const userEmail = req.userId;
-         if (!userEmail) {
-              throw new HttpError(401, 'Unauthorized access');
-            }
-        const { tmdbId } = req.body;
-        const userSeries = await addSeries(userEmail, tmdbId);
-        res.status(200).json({
-        userSeriesId: userSeries.userEmail, 
-        message: 'series was added successfully'
-      });
+watchlistRouter.post('/series', verifyToken, validate(addSeriesSchema), async (req, res) => {
+  const userEmail = req.userId;
+  if (!userEmail) {
+    throw new HttpError(401, 'Unauthorized access');
+  }
+  const { tmdbId } = req.body;
+  const userSeries = await addSeries(userEmail, tmdbId);
+  res.status(200).json({
+    userSeriesId: userSeries.userEmail,
+    message: 'series was added successfully',
+  });
+});
 
-    } catch(error) { 
-next(error);
+watchlistRouter.patch(
+  '/series/:seriesId',
+  verifyToken,
+  validate(updateUserStatusSchema),
+  async (req, res) => {
+    const userEmail = req.userId;
+    if (!userEmail) {
+      throw new HttpError(401, 'Unauthorized access');
     }
- })
+    const seriesId = Number(req.params.seriesId);
+    if (isNaN(seriesId) || !Number.isInteger(seriesId) || seriesId <= 0) {
+      throw new HttpError(400, 'Invalid series ID format. Must be a positive integer.');
+    }
+    const { userStatus } = req.body;
+    const updatedRecord = await updateUserStatus(userEmail, seriesId, userStatus);
+    res.status(200).json({
+      seriesId: updatedRecord.seriesId,
+      userStatus: updatedRecord.userStatus,
+      message: 'series status was updated successfully',
+    });
+  },
+);

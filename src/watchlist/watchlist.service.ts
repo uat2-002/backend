@@ -1,18 +1,13 @@
-import { addSeriesToUser } from "./watchlist.repository.js";
-import { HttpError } from "../errors/http-error.js";
+import { addSeriesToUser, updateUserSeriesStatus } from "./watchlist.repository.js";
 
-export async function addSeries(userEmail:string,tmdbId:number) {
-    try {
-        return await addSeriesToUser(userEmail, tmdbId);
-    }
-   catch (error) {
-    const err = error as { code?: string };
-    if (err.code === 'P2002') {
-      throw new HttpError(409, 'This serial is already in your list');
-    }
-    if (err.code === 'P2003') {
-      throw new HttpError(404, 'User or Series not found in database');
-    }
-        throw error;
-  }
+export async function addSeries(userEmail: string, tmdbId: number) {
+    return await addSeriesToUser(userEmail, tmdbId);
+}
+
+export async function updateUserStatus(
+    userEmail: string, 
+    seriesId: number, 
+    userStatus: "plan_to_watch" | "watching" | "watched" | "not_worth_it"
+) { 
+    return await updateUserSeriesStatus(userEmail, seriesId, userStatus);
 }
