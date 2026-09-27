@@ -1,4 +1,4 @@
-import { addSeriesToUser } from "./watchlist.repository.js";
+import { addSeriesToUser,updateUserSeriesStatus } from "./watchlist.repository.js";
 import { HttpError } from "../errors/http-error.js";
 
 export async function addSeries(userEmail:string,tmdbId:number) {
@@ -15,4 +15,16 @@ export async function addSeries(userEmail:string,tmdbId:number) {
     }
         throw error;
   }
-}
+};
+
+export async function updateUserStatus(userEmail:string,seriesId:number,userStatus:"plan_to_watch"|"watching"|"watched"|"not_worth_it") { 
+  try {
+    return await updateUserSeriesStatus(userEmail, seriesId, userStatus);
+   } catch (error) {
+    const err = error as { code?: string };
+    if (err.code === 'P2025') {
+            throw new HttpError(404, 'Series not found in your watchlist');
+        }
+    throw error;
+   }
+};
