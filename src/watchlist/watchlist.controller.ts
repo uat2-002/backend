@@ -12,8 +12,8 @@ watchlistRouter.get('/series', verifyToken, async (req, res) => {
   if (!userEmail) {
     throw new HttpError(401, 'Unauthorized access');
   }
-  const series = await getUserSeries(userEmail);
-  res.status(200).json(series);
+  const tmdbIds = await getUserSeries(userEmail);
+  res.status(200).json({ tmdbIds });
 });
 
 watchlistRouter.post('/series', verifyToken, validate(addSeriesSchema), async (req, res) => {
