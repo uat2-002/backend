@@ -38,11 +38,13 @@ export const toggleEpisodeWatched = async (
         userEmail,
         seriesId,
         watchedEpisodesCount: 1,
+        userStatus: 'watching',
       },
       update: {
         watchedEpisodesCount: {
           increment: 1,
         },
+        userStatus: 'watching',
       },
     }),
   ]);
