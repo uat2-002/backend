@@ -20,5 +20,6 @@ episodesRouter.post(
       return response.status(404).json({ error: 'Episode not found' });
     }
     await updateEpisodeStatus(userEmail, episode);
+    return response.status(200).json({ message: 'Episode status updated successfully' });
   }
 );
