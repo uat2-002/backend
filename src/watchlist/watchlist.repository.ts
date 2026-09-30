@@ -49,3 +49,14 @@ export async function deleteSeriesFromUser(userEmail: string, seriesId: number) 
 
   return deletedSeries;
 }
+
+export const getUserSeriesById = async (userEmail: string, seriesId: number) => {
+  return await prisma.userSeries.findUnique({
+    where: {
+      userEmail_seriesId: {
+        userEmail,
+        seriesId,
+      },
+    },
+  });
+};

@@ -2,6 +2,7 @@ import {
   addSeriesToUser,
   deleteSeriesFromUser,
   updateUserSeriesStatus,
+  getUserSeriesById,
 } from './watchlist.repository.js';
 
 export async function addSeries(userEmail: string, tmdbId: number) {
@@ -19,3 +20,16 @@ export async function updateUserStatus(
 export async function deleteSeries(userEmail: string, seriesId: number) {
   return await deleteSeriesFromUser(userEmail, seriesId);
 }
+
+export const fetchUserSeriesStatus = async (userEmail: string, seriesId: number) => {
+  const userSeries = await getUserSeriesById(userEmail, seriesId);
+
+  if (!userSeries) {
+    return { userStatus: 'none' };
+  }
+
+  return {
+    seriesId: userSeries.seriesId,
+    userStatus: userSeries.userStatus,
+  };
+};

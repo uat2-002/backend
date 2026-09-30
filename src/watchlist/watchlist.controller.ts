@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import { addSeriesSchema, updateUserStatusSchema } from './watchlist.schema.js';
-import { addSeries, deleteSeries, updateUserStatus } from './watchlist.service.js';
+import {
+  addSeries,
+  deleteSeries,
+  updateUserStatus,
+  fetchUserSeriesStatus,
+} from './watchlist.service.js';
 import { validate } from '../middleware/validate.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { HttpError } from '../errors/http-error.js';
@@ -55,4 +60,22 @@ watchlistRouter.delete('/series/:seriesId', verifyToken, async (req, res) => {
   res.status(200).json({
     message: 'series was removed successfully',
   });
+});
+
+watchlistRouter.get('/series/:seriesId', verifyToken, async (req, res) => {
+  const userEmail = req.userId;
+
+  if (!userEmail) {
+    throw new HttpError(401, 'Unauthorized');
+  }
+
+  const seriesId = Number(req.params.seriesId);
+
+  if (isNaN(seriesId) || seriesId <= 0) {
+    throw new HttpError(400, 'Invalid series ID');
+  }
+
+  const result = await fetchUserSeriesStatus(userEmail, seriesId);
+
+  res.status(200).json(result);
 });
