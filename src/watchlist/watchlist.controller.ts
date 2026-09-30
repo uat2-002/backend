@@ -1,11 +1,21 @@
 import { Router } from 'express';
 import { addSeriesSchema, updateUserStatusSchema } from './watchlist.schema.js';
-import { addSeries, deleteSeries, updateUserStatus } from './watchlist.service.js';
+import { getUserSeries, addSeries, deleteSeries, updateUserStatus } from './watchlist.service.js';
 import { validate } from '../middleware/validate.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { HttpError } from '../errors/http-error.js';
 
 export const watchlistRouter = Router();
+
+watchlistRouter.get('/series', verifyToken, async (req, res) => {
+  const userEmail = req.userId;
+  if (!userEmail) {
+    throw new HttpError(401, 'Unauthorized access');
+  }
+  const tmdbIds = await getUserSeries(userEmail);
+  res.status(200).json({ tmdbIds });
+});
+
 watchlistRouter.post('/series', verifyToken, validate(addSeriesSchema), async (req, res) => {
   const userEmail = req.userId;
   if (!userEmail) {

@@ -1,6 +1,7 @@
 import {
   addSeriesToUser,
   deleteSeriesFromUser,
+  getUserSeriesIds,
   updateUserSeriesStatus,
 } from './watchlist.repository.js';
 
@@ -18,4 +19,9 @@ export async function updateUserStatus(
 
 export async function deleteSeries(userEmail: string, seriesId: number) {
   return await deleteSeriesFromUser(userEmail, seriesId);
+}
+
+export async function getUserSeries(userEmail: string): Promise<number[]> {
+  const userSeries = await getUserSeriesIds(userEmail);
+  return userSeries.map((item) => item.seriesId);
 }
