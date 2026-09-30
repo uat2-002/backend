@@ -49,3 +49,14 @@ export async function deleteSeriesFromUser(userEmail: string, seriesId: number) 
 
   return deletedSeries;
 }
+
+export async function getUserSeriesIds(userEmail: string) {
+  return prisma.userSeries.findMany({
+    where: {
+      userEmail,
+    },
+    select: {
+      seriesId: true,
+    },
+  });
+}
