@@ -1,13 +1,21 @@
-import { addSeriesToUser, updateUserSeriesStatus } from "./watchlist.repository.js";
+import {
+  addSeriesToUser,
+  deleteSeriesFromUser,
+  updateUserSeriesStatus,
+} from './watchlist.repository.js';
 
 export async function addSeries(userEmail: string, tmdbId: number) {
-    return await addSeriesToUser(userEmail, tmdbId);
+  return await addSeriesToUser(userEmail, tmdbId);
 }
 
 export async function updateUserStatus(
-    userEmail: string, 
-    seriesId: number, 
-    userStatus: "plan_to_watch" | "watching" | "watched" | "not_worth_it"
-) { 
-    return await updateUserSeriesStatus(userEmail, seriesId, userStatus);
+  userEmail: string,
+  seriesId: number,
+  userStatus: 'plan_to_watch' | 'watching' | 'watched' | 'not_worth_it',
+) {
+  return await updateUserSeriesStatus(userEmail, seriesId, userStatus);
+}
+
+export async function deleteSeries(userEmail: string, seriesId: number) {
+  return await deleteSeriesFromUser(userEmail, seriesId);
 }
