@@ -3,21 +3,22 @@ import { mapTmdbStatus } from '../parser/tmdb-helpers.js';
 import type { TmdbSeriesResponseSchema, TmdbSeasonWithEpisodesSchema } from './series.schema.js';
 
 export const findUserSeriesWatchedEpisodes = async (userEmail: string, seriesId: number) => {
-  const userSeries = await prisma.userSeries.findUnique({
+  const watchedRecords = await prisma.userEpisode.findMany({
     where: {
-      userEmail_seriesId: {
-        userEmail,
-        seriesId,
+      userEmail: userEmail,
+      episode: {
+        seriesId: seriesId,
       },
     },
     select: {
-      watchedEpisodesCount: true,
+      episodeId: true,
     },
   });
-  if (!userSeries) {
-    return null;
+
+  if (!watchedRecords || watchedRecords.length === 0) {
+    return [];
   }
-  return userSeries.watchedEpisodesCount;
+  return watchedRecords.map(record => record.episodeId);
 };
 
 export const findSeriesDetails = async (seriesId: number) => {
