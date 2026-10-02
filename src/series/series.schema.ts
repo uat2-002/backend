@@ -1,4 +1,5 @@
 import z from 'zod';
+import { EpisodeResponseSchema } from '../episodes/episodes.schema.js';
 
 export const UpdateSeriesStatusSchema = z.object({
   seriesId: z.number(),
@@ -33,17 +34,6 @@ export const SeriesDetailsResponseSchema = z.object({
   numberOfEpisodes: z.number().nullable(),
   status: z.enum(['ongoing', 'ended', 'canceled']),
   seasons: z.array(SeasonSummaryResponseSchema),
-});
-
-export const EpisodeResponseSchema = z.object({
-  tmdbId: z.number(),
-  seasonNumber: z.number(),
-  episodeNum: z.number(),
-  title: z.string(),
-  overview: z.string().nullable(),
-  stillPath: z.string().nullable(),
-  airDate: z.string().nullable(),
-  isWatched: z.boolean(),
 });
 
 export const SeasonEpisodesResponseSchema = z.object({
