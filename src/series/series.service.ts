@@ -32,9 +32,9 @@ export const getOrSyncSeries = async (seriesId: number): Promise<SeriesWithSeaso
 export const getUserSeriesWatchedEpisodes = async (
   userEmail: string,
   seriesId: number
-): Promise<number> => {
-  const watchedEpisodesCount = await findUserSeriesWatchedEpisodes(userEmail, seriesId);
-  return watchedEpisodesCount ?? 0;
+): Promise<number[]> => {
+  const watchedEpisodes = await findUserSeriesWatchedEpisodes(userEmail, seriesId);
+  return watchedEpisodes;
 };
 
 export const makeSeriesPayload = (seriesDetails: SeriesWithSeasons) => {
