@@ -2,6 +2,24 @@ import { prisma } from '../prisma-client.js';
 import { mapTmdbStatus } from '../parser/tmdb-helpers.js';
 import type { TmdbSeriesResponseSchema, TmdbSeasonWithEpisodesSchema } from './series.schema.js';
 
+export const findUserSeriesWatchedEpisodes = async (userEmail: string, seriesId: number) => {
+  const userSeries = await prisma.userSeries.findUnique({
+    where: {
+      userEmail_seriesId: {
+        userEmail,
+        seriesId,
+      },
+    },
+    select: {
+      watchedEpisodesCount: true,
+    },
+  });
+  if (!userSeries) {
+    return null;
+  }
+  return userSeries.watchedEpisodesCount;
+};
+
 export const findSeriesDetails = async (seriesId: number) => {
   const series = await prisma.series.findUnique({
     where: {
