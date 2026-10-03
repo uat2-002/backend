@@ -2,10 +2,12 @@ import { Router, type Request, type Response } from 'express';
 import {
   getOrSyncSeasonEpisodes,
   getOrSyncSeries,
+  getUserSeriesWatchedEpisodes,
   makeSeasonWithEpisodesPayload,
   makeSeriesPayload,
 } from './series.service.js';
 import { getSeries, parseMaxAge } from '../parser/series.js';
+import { verifyToken } from '../middleware/authMiddleware.js';
 
 export const seriesRouter = Router();
 
@@ -45,4 +47,14 @@ seriesRouter.get('/series/:id/season/:seasonNumber', async (req: Request, res: R
     res.status(200).json(seasonWithEpisodesPayload);
   }
 });
-// implement episodes progress
+seriesRouter.get('/series/:id/watched', verifyToken, async (req: Request, res: Response) => {
+  if (req.params.id) {
+    const seriesId = Number(req.params.id);
+    const userEmail = req.userId;
+    if (!userEmail) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const watchedEpisodesCount = await getUserSeriesWatchedEpisodes(userEmail, seriesId);
+    return res.status(200).json({ watchedEpisodesCount });
+  }
+});

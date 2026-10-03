@@ -10,6 +10,7 @@ import {
   createSeries,
   findSeasonDetails,
   createSeasonWithEpisodes,
+  findUserSeriesWatchedEpisodes,
 } from './series.repository.js';
 import { HttpError } from '../errors/http-error.js';
 
@@ -26,6 +27,14 @@ export const getOrSyncSeries = async (seriesId: number): Promise<SeriesWithSeaso
   series = await createSeries(parsedSeries);
 
   return series;
+};
+
+export const getUserSeriesWatchedEpisodes = async (
+  userEmail: string,
+  seriesId: number
+): Promise<number[]> => {
+  const watchedEpisodes = await findUserSeriesWatchedEpisodes(userEmail, seriesId);
+  return watchedEpisodes;
 };
 
 export const makeSeriesPayload = (seriesDetails: SeriesWithSeasons) => {
