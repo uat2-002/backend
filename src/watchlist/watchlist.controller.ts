@@ -6,6 +6,7 @@ import {
   updateUserStatus,
   fetchUserSeriesStatus,
   getUserSeries,
+  getUserSeriesWithDetails,
 } from './watchlist.service.js';
 import { validate } from '../middleware/validate.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
@@ -89,4 +90,16 @@ watchlistRouter.get('/series/:seriesId', verifyToken, async (req, res) => {
   const result = await fetchUserSeriesStatus(userEmail, seriesId);
 
   res.status(200).json(result);
+});
+
+watchlistRouter.get('/series-data', verifyToken, async (req, res) => {
+  const userEmail = req.userId;
+
+  if (!userEmail) {
+    throw new HttpError(401, 'Unauthorized access');
+  }
+
+  const series = await getUserSeriesWithDetails(userEmail);
+
+  res.status(200).json({ series });
 });
