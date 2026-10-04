@@ -70,3 +70,17 @@ export async function getUserSeriesIds(userEmail: string) {
     },
   });
 }
+
+export async function findUserSeriesWithDetails(userEmail: string) {
+  return prisma.userSeries.findMany({
+    where: {
+      userEmail,
+    },
+    include: {
+      series: true,
+    },
+    orderBy: {
+      dateAdded: 'desc',
+    },
+  });
+}
