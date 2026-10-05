@@ -1,4 +1,4 @@
-import type { SeriesStatus } from './../generated/prisma/enums.js';
+import type { SeriesStatus } from '../generated/prisma/index.js';
 
 export function mapTmdbStatus(status: string): SeriesStatus {
   const lowered = status.toLowerCase();
