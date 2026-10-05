@@ -33,3 +33,6 @@ jobs:
 
       - name: Build project
         run: npm run build
+        env:
+          DIRECT_URL: postgresql://dummy:dummy@localhost:5432/dummy
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
