@@ -83,6 +83,7 @@ export const createSeries = async (parsedSeries: TmdbSeriesResponseSchema) => {
             name: s.name,
             overview: s.overview,
             poster: s.poster_path,
+            episodeCount: s.episode_count ?? 0,
           })),
       },
     },

@@ -54,6 +54,7 @@ export const makeSeriesPayload = (seriesDetails: SeriesWithSeasons) => {
       name: season.name,
       overview: season.overview,
       poster: season.poster,
+      episodeCount: season.episodeCount,
     })),
   };
   return SeriesDetailsResponseSchema.parse(seriesPayload);

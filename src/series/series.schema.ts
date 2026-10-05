@@ -21,6 +21,7 @@ export const SeasonSummaryResponseSchema = z.object({
   name: z.string(),
   overview: z.string().nullable(),
   poster: z.string().nullable(),
+  episodeCount: z.number(),
 });
 
 export const SeriesDetailsResponseSchema = z.object({
