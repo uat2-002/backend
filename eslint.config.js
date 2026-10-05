@@ -5,7 +5,7 @@ import prettier from 'eslint-config-prettier';
 import { defineConfig, globalIgnores } from 'eslint/config';
 
 export default defineConfig([
-  globalIgnores(['**/node_modules/**', '**/dist/**', '.env', '.env.*']),
+  globalIgnores(['src/generated/**','**/node_modules/**', '**/dist/**', '.env', '.env.*']),
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
