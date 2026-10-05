@@ -42,8 +42,18 @@ export const SeasonEpisodesResponseSchema = z.object({
   episodes: z.array(EpisodeResponseSchema),
 });
 
+export const WatchedEpisodeSchema = z.object({
+  episodeId: z.number(),
+  seasonNumber: z.number(),
+});
+
+export const WatchedEpisodesResponseSchema = z.object({
+  watchedEpisodes: z.array(WatchedEpisodeSchema),
+});
+
 export type SeriesDetailsResponse = z.infer<typeof SeriesDetailsResponseSchema>;
 export type SeasonEpisodesResponse = z.infer<typeof SeasonEpisodesResponseSchema>;
+export type WatchedEpisode = z.infer<typeof WatchedEpisodeSchema>;
 
 export const TmdbEpisodeSchema = z.object({
   id: z.number(),
