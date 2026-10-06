@@ -66,6 +66,7 @@ model Season {
   name         String
   overview     String?
   poster       String?
+  episodeCount Int      @default(0)
 
   series   Series    @relation(fields: [seriesId], references: [tmdbId], onDelete: Cascade)
   episodes Episode[]
