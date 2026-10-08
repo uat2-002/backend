@@ -54,7 +54,8 @@ seriesRouter.get('/series/:id/watched', verifyToken, async (req: Request, res: R
     if (!userEmail) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
-    const watchedEpisodesCount = await getUserSeriesWatchedEpisodes(userEmail, seriesId);
-    return res.status(200).json({ watchedEpisodesCount });
+
+    const watchedEpisodes = await getUserSeriesWatchedEpisodes(userEmail, seriesId);
+    return res.status(200).json({ watchedEpisodes });
   }
 });

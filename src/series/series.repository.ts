@@ -12,13 +12,22 @@ export const findUserSeriesWatchedEpisodes = async (userEmail: string, seriesId:
     },
     select: {
       episodeId: true,
+      episode: {
+        select: {
+          seasonNumber: true,
+        },
+      },
     },
   });
 
   if (!watchedRecords || watchedRecords.length === 0) {
     return [];
   }
-  return watchedRecords.map(record => record.episodeId);
+
+  return watchedRecords.map(record => ({
+    episodeId: record.episodeId,
+    seasonNumber: record.episode.seasonNumber,
+  }));
 };
 
 export const findSeriesDetails = async (seriesId: number) => {
@@ -75,6 +84,7 @@ export const createSeries = async (parsedSeries: TmdbSeriesResponseSchema) => {
             name: s.name,
             overview: s.overview,
             poster: s.poster_path,
+            episodeCount: s.episode_count ?? 0,
           })),
       },
     },

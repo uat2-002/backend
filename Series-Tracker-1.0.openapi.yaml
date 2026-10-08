@@ -1,0 +1,1284 @@
+openapi: "3.0.3"
+info:
+  title: "Series Tracker API"
+  version: "1.0"
+  description: |-
+    Series Tracker 1.0 API for finding TV series, managing a personal watchlist, and tracking watched episodes. This document describes the current backend implementation.
+    
+    Authentication: register through /api/register, log in through /api/login, and send Authorization: Bearer <accessToken> to protected endpoints.
+    Access tokens expire after 15 minutes; refresh tokens expire after 7 days. /api/refresh returns only a new accessToken. Tokens are sent in JSON; cookie-based authentication is not implemented.
+    
+    Series, season, and episode IDs are separate TMDB identifiers. seasonNumber and episodeNumber are sequential numbers, not TMDB IDs. Image fields contain relative TMDB paths or null.
+    
+    Before adding a series to the watchlist, load /api/series/{id} to persist it. Before toggling an episode, load /api/series/{id}/season/{seasonNumber} to persist the season's episodes.
+    
+    Implementation details that affect clients:
+    - /api/series/{id}/watched returns an array of episode IDs in watchedEpisodesCount.
+    - POST /user/series returns the user's email in userSeriesId.
+    - POST /api/user/episodes/{episodeId}/status toggles state and ignores the request body, including isWatched.
+    - Empty searches and absent personal watchlist entries may return 200.
+    - Unhandled errors, including JSON parsing failures, are returned as 500.
+servers:
+  -
+    url: "http://localhost:{port}"
+    description: "Local backend. Set the port to the configured PORT value."
+    variables:
+      port:
+        default: "3000"
+        description: "Initial value from .env.example. Replace it with your configured PORT."
+tags:
+  -
+    name: "Authentication"
+    description: "Registration, login, access-token refresh, and logout."
+  -
+    name: "Series"
+    description: "Popular series, series details, seasons, and watched episode IDs."
+  -
+    name: "Search"
+    description: "TV series search through TMDB."
+  -
+    name: "Watchlist"
+    description: "The authenticated user's personal series list."
+  -
+    name: "Episodes"
+    description: "Episode viewing-state toggles."
+  -
+    name: "Health"
+    description: "HTTP service availability."
+security: []
+paths:
+  "/health":
+    get:
+      tags: ["Health"]
+      operationId: "getHealth"
+      summary: "Check service availability"
+      description: "Returns a static response. It does not test database connectivity or TMDB availability."
+      responses:
+        "200":
+          description: "The HTTP service is available."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  "/api/register":
+    post:
+      tags: ["Authentication"]
+      operationId: "registerUser"
+      summary: "Register a user"
+      description: |-
+        Creates an account and returns its email address. Registration does not issue tokens.
+        Email validation happens before normalization to lowercase. Leading or trailing whitespace may cause a 400 response.
+        Unknown JSON properties are stripped.
+      requestBody:
+        $ref: "#/components/requestBodies/Credentials"
+      responses:
+        "201":
+          description: "Account created."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RegisteredUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: "The email is already in use. A concurrent-registration uniqueness conflict may instead produce the shared message 'This serial is already in your list'."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Email already in use"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/login":
+    post:
+      tags: ["Authentication"]
+      operationId: "loginUser"
+      summary: "Log in and obtain JWT tokens"
+      description: |-
+        Checks the email and password using the same request validation as registration, including the minimum password length of 8 characters.
+        The JWT userId claim contains the user's email address.
+        Only one refresh-token value is stored per account. A new login replaces the stored value.
+      requestBody:
+        $ref: "#/components/requestBodies/Credentials"
+      responses:
+        "200":
+          description: "Login succeeded."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: "The account does not exist or the password is incorrect."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Authentication failed"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/refresh":
+    post:
+      tags: ["Authentication"]
+      operationId: "refreshAccessToken"
+      summary: "Refresh the access token"
+      description: |-
+        Verifies the refresh token's signature and expiration, and checks it against the value stored in the database.
+        Returns only a new accessToken. The refresh token is not rotated and its expiration is not extended. A bearer access token is not required.
+        A missing or falsy refreshToken field in a JSON object returns 401. A request with no JSON body may return 500 because req.body has no dedicated validation.
+        All failures inside the refresh service, including database failures, are converted to 401 with 'Invalid refresh token'.
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/RefreshRequest"
+      responses:
+        "200":
+          description: "A new access token was issued."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/AccessTokenResponse"
+        "401":
+          description: "The refresh token is missing, invalid, expired, or revoked, or the refresh service failed."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missing:
+                  value:
+                    error: "Refresh token required"
+                invalid:
+                  value:
+                    error: "Invalid refresh token"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/logout":
+    post:
+      tags: ["Authentication"]
+      operationId: "logoutUser"
+      summary: "Log out"
+      description: "Clears the user's stored refresh token. Previously issued access tokens remain valid until they expire. No request body is required."
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "The stored refresh token was revoked."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: "Logged out successfully"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "The account no longer exists. The shared Prisma P2025 handler uses the following watchlist-related error message."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Series not found in your watchlist"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/me":
+    get:
+      tags: ["Authentication"]
+      operationId: "getCurrentUser"
+      summary: "Read the current user's email from the access token"
+      description: |-
+        Returns the email from the userId claim of a verified JWT. It does not check whether the account still exists in the database.
+        userEmail is present for tokens issued by /api/login. A signed JWT without a userId claim may produce a response without userEmail.
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "JWT verification succeeded."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/CurrentUserResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+  "/api/series":
+    get:
+      tags: ["Series"]
+      operationId: "getPopularSeries"
+      summary: "Get popular TV series"
+      description: |-
+        Returns a plain array from the first page of TMDB /tv/popular. This endpoint does not expose pagination.
+        Results are cached in memory and on disk. This request does not create Series records in the database.
+        An invalid maxAge falls back to 12h instead of returning 400.
+      parameters:
+        -
+          name: "maxAge"
+          in: "query"
+          required: false
+          description: |-
+            Maximum cache age: a nonnegative integer followed by h (hours), m (minutes), or d (days).
+            A number without a suffix is interpreted as hours. Surrounding whitespace is trimmed.
+            Examples: 12h, 30m, 2d, 12. Missing or invalid values default to 12h.
+            0, 0h, 0m, or 0d force a fresh fetch. Suffixes are case-sensitive; 12H is not recognized.
+          schema:
+            type: "string"
+            default: "12h"
+          examples:
+            hours:
+              value: "12h"
+            minutes:
+              value: "30m"
+            days:
+              value: "2d"
+            forceRefresh:
+              value: "0"
+      responses:
+        "200":
+          description: "Popular series loaded from cache or TMDB."
+          content:
+            "application/json":
+              schema:
+                type: "array"
+                items:
+                  $ref: "#/components/schemas/PopularSeries"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        "502":
+          description: "Failed to fetch popular series from TMDB."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/PopularSeriesError"
+              example:
+                error: "Failed to fetch series from TMDb"
+                details: "TMDb request failed: 503 Service Unavailable"
+  "/api/series/{id}":
+    get:
+      tags: ["Series"]
+      operationId: "getSeriesDetails"
+      summary: "Get series details and season summaries"
+      description: |-
+        Reads the series from the database first. If it is missing, fetches it from TMDB and stores it with seasons whose seasonNumber is greater than 0.
+        Existing database records are returned without refreshing their TMDB metadata. Seasons are sorted by seasonNumber in ascending order. Episodes are not loaded by this endpoint.
+        There is no explicit validation of id; an invalid value may result in 500.
+      parameters:
+        -
+          $ref: "#/components/parameters/SeriesId"
+      responses:
+        "200":
+          description: "Series details."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SeriesDetails"
+        "404":
+          description: "The series was not found in TMDB."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Series not found"
+        "409":
+          $ref: "#/components/responses/DatabaseConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        default:
+          $ref: "#/components/responses/UpstreamError"
+  "/api/series/{id}/season/{seasonNumber}":
+    get:
+      tags: ["Series"]
+      operationId: "getSeasonEpisodes"
+      summary: "Get a season and its episodes"
+      description: |-
+        Returns the stored season when it already contains episodes. Otherwise, loads the series if needed, fetches the season from TMDB, and stores its episodes.
+        Episodes are sorted by their sequential number in ascending order. A stored nonempty season is not refreshed on subsequent requests.
+        The response uses episodeNumber. It does not include episodeNum or isWatched. Read personal viewing state through /api/series/{id}/watched.
+        Numeric path parameters have no explicit validation. Season 0 is excluded during the initial series import, so special episodes are not reliably supported by this endpoint.
+      parameters:
+        -
+          $ref: "#/components/parameters/SeriesId"
+        -
+          name: "seasonNumber"
+          in: "path"
+          required: true
+          description: "Sequential regular-season number, starting at 1. This is not a TMDB season ID."
+          schema:
+            type: "integer"
+          example: 1
+      responses:
+        "200":
+          description: "Season metadata and episodes."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SeasonWithEpisodes"
+        "404":
+          description: "The series or season was not found, or a related database record is missing."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                seriesMissing:
+                  value:
+                    error: "Series not found"
+                seasonMissing:
+                  value:
+                    error: "Seasons not found"
+                relationMissing:
+                  value:
+                    error: "User or Series not found in database"
+        "409":
+          $ref: "#/components/responses/DatabaseConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+        default:
+          $ref: "#/components/responses/UpstreamError"
+  "/api/series/{id}/watched":
+    get:
+      tags: ["Series"]
+      operationId: "getWatchedEpisodeIds"
+      summary: "Get watched episode IDs for a series"
+      description: |-
+        Returns TMDB IDs of episodes watched by the current user.
+        Despite its name, watchedEpisodesCount is an array of numbers, not a count.
+        Returns an empty array when no matching watch records exist. The series itself is not separately checked for existence. ID ordering is unspecified.
+        There is no explicit validation of id.
+      security:
+        -
+          bearerAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/SeriesId"
+      responses:
+        "200":
+          description: "Watched episode IDs."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/WatchedEpisodeIdsResponse"
+              examples:
+                watched:
+                  value:
+                    watchedEpisodesCount: [1001,1002]
+                empty:
+                  value:
+                    watchedEpisodesCount: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/search/series":
+    get:
+      tags: ["Search"]
+      operationId: "searchSeries"
+      summary: "Search TV series by name"
+      description: |-
+        Trims query and forwards it to TMDB /search/tv. The backend fixes language to en-US and include_adult to false.
+        Successful TMDB data is forwarded without renaming fields, including name, poster_path, and first_air_date.
+        A missing, empty, or whitespace-only query returns 200 with results: [] and message: Search query is required, without pagination fields.
+        When a valid search has no matches, the backend adds message: No results found for your search.
+        page is parsed using parseInt(value, 10) and has no local range validation.
+      externalDocs:
+        description: "TMDB TV search response format."
+        url: "https://developer.themoviedb.org/reference/search-tv"
+      parameters:
+        -
+          name: "query"
+          in: "query"
+          required: false
+          description: "Search title. Leading and trailing whitespace is removed."
+          schema:
+            type: "string"
+          example: "Breaking Bad"
+        -
+          name: "page"
+          in: "query"
+          required: false
+          description: "Result page number. Defaults to 1 when omitted. TMDB may reject an invalid page number."
+          schema:
+            type: "integer"
+            default: 1
+          example: 1
+      responses:
+        "200":
+          description: "Search results, or an empty result with an explanation."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+              examples:
+                results:
+                  value:
+                    page: 1
+                    results:
+                      -
+                        id: 1396
+                        name: "Breaking Bad"
+                        original_name: "Breaking Bad"
+                        original_language: "en"
+                        overview: "A chemistry teacher leads a double life."
+                        poster_path: "/poster.jpg"
+                        backdrop_path: null
+                        first_air_date: "2008-01-20"
+                        genre_ids: [18,80]
+                        origin_country: ["US"]
+                        popularity: 100
+                        vote_average: 8.8
+                        vote_count: 1000
+                        adult: false
+                    total_pages: 1
+                    total_results: 1
+                missingQuery:
+                  value:
+                    results: []
+                    message: "Search query is required"
+                noMatches:
+                  value:
+                    page: 1
+                    results: []
+                    total_pages: 0
+                    total_results: 0
+                    message: "No results found for your search"
+        "500":
+          description: "TMDB_API_KEY is missing, a TMDB connection error occurred, or an internal error occurred. TMDB responses with status 500 may retain their upstream message."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                missingKey:
+                  value:
+                    error: "TMDb key is missing from environment variables"
+                networkFailure:
+                  value:
+                    error: "Failed to fetch data from TMDb API"
+                internal:
+                  value:
+                    error: "Internal server error"
+        default:
+          $ref: "#/components/responses/UpstreamError"
+  "/user/series":
+    get:
+      tags: ["Watchlist"]
+      operationId: "getWatchlistIds"
+      summary: "Get series IDs in the current user's watchlist"
+      description: "Returns TMDB series IDs without series details. Ordering is unspecified."
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "Watchlist IDs. An empty watchlist also returns 200."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/WatchlistIdsResponse"
+              examples:
+                populated:
+                  value:
+                    tmdbIds: [1396,1399]
+                empty:
+                  value:
+                    tmdbIds: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: ["Watchlist"]
+      operationId: "addSeriesToWatchlist"
+      summary: "Add a series to the watchlist"
+      description: |-
+        Creates a link between the user and a series that already exists in the database. This endpoint does not import series from TMDB; first call /api/series/{id}.
+        The initial personal status is plan_to_watch and the watched-episode count is 0.
+        Adding an existing watchlist entry returns 409. Unknown JSON properties are stripped.
+        The response field userSeriesId currently contains the user's email address.
+      security:
+        -
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/AddSeriesRequest"
+      responses:
+        "200":
+          description: "Series added. The current implementation returns 200 rather than 201."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/AddSeriesResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "The user or series does not exist in the database."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "User or Series not found in database"
+        "409":
+          $ref: "#/components/responses/DatabaseConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/user/series/{seriesId}":
+    parameters:
+      -
+        $ref: "#/components/parameters/WatchlistSeriesId"
+    get:
+      tags: ["Watchlist"]
+      operationId: "getWatchlistSeriesStatus"
+      summary: "Get the personal status of a series"
+      description: |-
+        For a watchlist entry, returns seriesId and userStatus. If no entry exists, returns 200 with userStatus: none and omits seriesId.
+        The shared series catalog is not checked for existence.
+        The controller only rejects NaN and values less than or equal to 0. A positive fractional ID may reach the database and result in 500.
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "Current personal status or an indication that the series is absent from the watchlist."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/WatchlistStatusResponse"
+              examples:
+                inWatchlist:
+                  value:
+                    seriesId: 1396
+                    userStatus: "watching"
+                absent:
+                  value:
+                    userStatus: "none"
+        "400":
+          description: "seriesId is not a number or is not greater than zero."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Invalid series ID"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: ["Watchlist"]
+      operationId: "updateWatchlistSeriesStatus"
+      summary: "Update the personal status of a series"
+      description: |-
+        Updates only userStatus for an existing watchlist entry. It does not mark episodes as watched or change the watched-episode count.
+        Unknown JSON properties are stripped.
+      security:
+        -
+          bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/UpdateUserStatusRequest"
+      responses:
+        "200":
+          description: "Personal status updated."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/UpdateUserStatusResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/WatchlistNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    delete:
+      tags: ["Watchlist"]
+      operationId: "removeSeriesFromWatchlist"
+      summary: "Remove a series from the watchlist"
+      description: |-
+        Atomically deletes the watchlist entry and all of the current user's watched-episode associations for that series.
+        Shared series, season, and episode records are preserved. Repeating deletion after the entry is gone returns 404.
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "The watchlist entry and personal watch marks were removed."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: "series was removed successfully"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/WatchlistNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/user/series-data":
+    get:
+      tags: ["Watchlist"]
+      operationId: "getWatchlistDetails"
+      summary: "Get the watchlist with series details"
+      description: |-
+        Returns short series cards with personal statuses, ordered by date added from newest to oldest.
+        This endpoint has no pagination or filters. Date added and watch progress are not included in the response.
+      security:
+        -
+          bearerAuth: []
+      responses:
+        "200":
+          description: "Series cards in the current user's watchlist."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/WatchlistDetailsResponse"
+              examples:
+                populated:
+                  value:
+                    series:
+                      -
+                        tmdbId: 1396
+                        title: "Breaking Bad"
+                        poster: "/poster.jpg"
+                        overview: "A chemistry teacher leads a double life."
+                        userStatus: "watching"
+                empty:
+                  value:
+                    series: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  "/api/user/episodes/{episodeId}/status":
+    post:
+      tags: ["Episodes"]
+      operationId: "toggleEpisodeWatchedStatus"
+      summary: "Toggle whether an episode is watched"
+      description: |-
+        Marks an unwatched episode as watched, or removes an existing watch mark. This operation is not idempotent: repeating the call toggles the state again.
+        No request body is used. Sending isWatched does not set a desired state.
+        The episode must already exist in the database. Marking it watched increments the series' watched-episode count and sets userStatus to watching. If the series is absent from the user's watchlist, an entry is created with status watching and count 1.
+        Removing the watch mark decrements the count, preserves userStatus, and keeps the series in the watchlist. Each transition runs in a transaction.
+        The response contains only message, without the resulting state or count. episodeId has no explicit validation; an invalid value may result in 500.
+      security:
+        -
+          bearerAuth: []
+      parameters:
+        -
+          name: "episodeId"
+          in: "path"
+          required: true
+          description: "TMDB ID of a stored episode, not its sequential episode number."
+          schema:
+            type: "integer"
+          example: 1001
+      responses:
+        "200":
+          description: "The watch state was toggled."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+              example:
+                message: "Episode status updated successfully"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: "The episode or a related database record was not found."
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                episodeMissing:
+                  value:
+                    error: "Episode not found"
+                relationMissing:
+                  value:
+                    error: "User or Series not found in database"
+                watchlistMissing:
+                  value:
+                    error: "Series not found in your watchlist"
+        "409":
+          $ref: "#/components/responses/DatabaseConflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: "http"
+      scheme: "bearer"
+      bearerFormat: "JWT"
+      description: |-
+        Use the access token issued by /api/login or /api/refresh.
+        Send Authorization: Bearer <accessToken>. The Bearer prefix is case-sensitive in the current middleware.
+        In Swagger UI, enter only the token in the Authorize dialog. Access tokens expire after 15 minutes.
+  parameters:
+    SeriesId:
+      name: "id"
+      in: "path"
+      required: true
+      description: "TMDB series ID. /api/series endpoints do not explicitly validate this path parameter."
+      schema:
+        type: "integer"
+      example: 1396
+    WatchlistSeriesId:
+      name: "seriesId"
+      in: "path"
+      required: true
+      description: "Positive integer TMDB series ID. PATCH and DELETE validate integer values greater than 0. GET does not check whether the value is an integer."
+      schema:
+        type: "integer"
+        minimum: 1
+      example: 1396
+  requestBodies:
+    Credentials:
+      required: true
+      description: "Email and password. Unknown JSON properties are stripped."
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/Credentials"
+  responses:
+    BadRequest:
+      description: |-
+        Invalid JSON fields or path parameter. Zod validation messages are joined with commas.
+        PATCH and DELETE return 'Invalid series ID format. Must be a positive integer.' for an invalid seriesId.
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            shortPassword:
+              value:
+                error: "Password must be at least 8 characters"
+            invalidTmdbId:
+              value:
+                error: "TMDB ID must be positive number"
+            invalidPath:
+              value:
+                error: "Invalid series ID format. Must be a positive integer."
+    Unauthorized:
+      description: |-
+        Access denied: the Authorization header is missing, the prefix is incorrect, or the token is empty.
+        Invalid token: the JWT is invalid or expired.
+        For a verified token without a userId claim, individual controllers may return 'Unauthorized' or 'Unauthorized access'.
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missing:
+              value:
+                error: "Access denied"
+            invalid:
+              value:
+                error: "Invalid token"
+    WatchlistNotFound:
+      description: "The series is absent from the current user's watchlist."
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Series not found in your watchlist"
+    DatabaseConflict:
+      description: "A database uniqueness constraint was violated. Usually caused by adding the same series twice; it can also occur during concurrent operations. The shared error handler determines this message."
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "This serial is already in your list"
+    InternalError:
+      description: "An unexpected server or database error occurred."
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Internal server error"
+    UpstreamError:
+      description: |-
+        A TMDB error with the HTTP status returned by the upstream service.
+        Series details use 'Series not found'; season details use 'Seasons not found'. Search forwards TMDB status_message or a fallback error message.
+        Possible upstream responses include 400, 401, 403, 422, 429, and 5xx.
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorResponse:
+      type: "object"
+      required: ["error"]
+      properties:
+        error:
+          type: "string"
+          description: "Human-readable error message. The current API does not return a separate machine-readable error code."
+      example:
+        error: "Internal server error"
+    MessageResponse:
+      type: "object"
+      required: ["message"]
+      properties:
+        message:
+          type: "string"
+          description: "Human-readable operation result."
+    HealthResponse:
+      type: "object"
+      required: ["status","service"]
+      properties:
+        status:
+          type: "string"
+          enum: ["ok"]
+        service:
+          type: "string"
+          enum: ["serial-tracker-backend"]
+      example:
+        status: "ok"
+        service: "serial-tracker-backend"
+    Credentials:
+      type: "object"
+      required: ["email","password"]
+      properties:
+        email:
+          type: "string"
+          description: "A valid email address. Validation happens before trimming and lowercasing, so surrounding whitespace can cause a validation error."
+          format: "email"
+          example: "viewer@example.com"
+        password:
+          type: "string"
+          description: "Password with at least 8 characters. This constraint applies to both registration and login."
+          format: "password"
+          minLength: 8
+          example: "SeriesTracker123!"
+    RegisteredUser:
+      type: "object"
+      required: ["email"]
+      properties:
+        email:
+          type: "string"
+          description: "The registered email address, normalized to lowercase."
+          format: "email"
+          example: "viewer@example.com"
+    LoginResponse:
+      type: "object"
+      required: ["accessToken","refreshToken"]
+      properties:
+        accessToken:
+          type: "string"
+          description: "JWT access token for protected endpoints. Expires after 15 minutes."
+        refreshToken:
+          type: "string"
+          description: "JWT refresh token for /api/refresh. Expires after 7 days."
+      example:
+        accessToken: "<accessToken>"
+        refreshToken: "<refreshToken>"
+    RefreshRequest:
+      type: "object"
+      required: ["refreshToken"]
+      properties:
+        refreshToken:
+          type: "string"
+          description: "The refresh token returned by login."
+          minLength: 1
+      example:
+        refreshToken: "<refreshToken>"
+    AccessTokenResponse:
+      type: "object"
+      required: ["accessToken"]
+      properties:
+        accessToken:
+          type: "string"
+          description: "A new JWT access token that expires after 15 minutes."
+      example:
+        accessToken: "<accessToken>"
+    CurrentUserResponse:
+      type: "object"
+      required: ["message"]
+      properties:
+        message:
+          type: "string"
+          enum: ["Authorized access"]
+        userEmail:
+          type: "string"
+          description: "Value of the JWT userId claim. Present for tokens issued by this API."
+          format: "email"
+      example:
+        message: "Authorized access"
+        userEmail: "viewer@example.com"
+    SeriesStatus:
+      type: "string"
+      description: "Production status. TMDB statuses containing 'ended' map to ended; statuses containing 'cancel' map to canceled; all other values map to ongoing."
+      enum: ["ongoing","ended","canceled"]
+    UserSeriesStatus:
+      type: "string"
+      description: "Personal viewing status: plan_to_watch = planned; watching = in progress; watched = completed; not_worth_it = not worth watching. Updating this value does not change episode watch marks."
+      enum: ["plan_to_watch","watching","watched","not_worth_it"]
+    ImagePath:
+      type: "string"
+      description: "Relative TMDB image path, or null when no image is available. Add the TMDB image-service base URL to display the image."
+      nullable: true
+      example: "/poster.jpg"
+    NullableOverview:
+      type: "string"
+      description: "Series, season, or episode overview. May be null."
+      nullable: true
+      example: "A short plot summary."
+    NullableDateTime:
+      type: "string"
+      description: "ISO 8601 UTC date-time, or null when the date is unavailable."
+      format: "date-time"
+      nullable: true
+      example: "2008-01-20T00:00:00.000Z"
+    PopularSeries:
+      type: "object"
+      required: ["id","title","poster","backdrop","description","rating","releaseDate"]
+      properties:
+        id:
+          type: "integer"
+          description: "TMDB series ID. This endpoint uses id rather than tmdbId."
+          example: 1396
+        title:
+          type: "string"
+          description: "Series title."
+          example: "Breaking Bad"
+        poster:
+          $ref: "#/components/schemas/ImagePath"
+        backdrop:
+          $ref: "#/components/schemas/ImagePath"
+        description:
+          type: "string"
+          description: "TMDB overview. This endpoint calls the field description rather than overview."
+        rating:
+          type: "number"
+          description: "The vote_average value returned by TMDB."
+          example: 8.8
+        releaseDate:
+          type: "string"
+          description: "TMDB first_air_date, usually YYYY-MM-DD. May be an empty string."
+          example: "2008-01-20"
+    PopularSeriesError:
+      type: "object"
+      required: ["error","details"]
+      properties:
+        error:
+          type: "string"
+          enum: ["Failed to fetch series from TMDb"]
+        details:
+          type: "string"
+          description: "Underlying fetch error message."
+    SeasonSummary:
+      type: "object"
+      required: ["tmdbId","seasonNumber","name","overview","poster"]
+      properties:
+        tmdbId:
+          type: "integer"
+          description: "TMDB season ID. This is different from its sequential season number."
+          example: 3572
+        seasonNumber:
+          type: "integer"
+          description: "Sequential season number."
+          example: 1
+        name:
+          type: "string"
+          description: "Season name."
+          example: "Season 1"
+        overview:
+          $ref: "#/components/schemas/NullableOverview"
+        poster:
+          $ref: "#/components/schemas/ImagePath"
+    SeriesDetails:
+      type: "object"
+      required: ["tmdbId","title","poster","backdrop","overview","firstAirDate","numberOfSeasons","numberOfEpisodes","status","seasons"]
+      properties:
+        tmdbId:
+          type: "integer"
+          description: "TMDB series ID."
+          example: 1396
+        title:
+          type: "string"
+          description: "Series title."
+          example: "Breaking Bad"
+        poster:
+          $ref: "#/components/schemas/ImagePath"
+        backdrop:
+          $ref: "#/components/schemas/ImagePath"
+        overview:
+          $ref: "#/components/schemas/NullableOverview"
+        firstAirDate:
+          $ref: "#/components/schemas/NullableDateTime"
+        numberOfSeasons:
+          type: "integer"
+          description: "Total season count from stored TMDB metadata."
+          nullable: true
+          example: 5
+        numberOfEpisodes:
+          type: "integer"
+          description: "Total episode count from stored TMDB metadata."
+          nullable: true
+          example: 62
+        status:
+          $ref: "#/components/schemas/SeriesStatus"
+        seasons:
+          type: "array"
+          description: "Stored seasons sorted by seasonNumber in ascending order."
+          items:
+            $ref: "#/components/schemas/SeasonSummary"
+    Episode:
+      type: "object"
+      required: ["tmdbId","seasonNumber","episodeNumber","title","overview","stillPath","airDate"]
+      properties:
+        tmdbId:
+          type: "integer"
+          description: "TMDB episode ID used by the watch-status toggle endpoint."
+          example: 1001
+        seasonNumber:
+          type: "integer"
+          description: "Sequential season number."
+          example: 1
+        episodeNumber:
+          type: "integer"
+          description: "Sequential episode number within the season. This is the actual field name in this response."
+          example: 1
+        title:
+          type: "string"
+          description: "Episode title."
+          example: "Pilot"
+        overview:
+          $ref: "#/components/schemas/NullableOverview"
+        stillPath:
+          $ref: "#/components/schemas/ImagePath"
+        airDate:
+          $ref: "#/components/schemas/NullableDateTime"
+    SeasonWithEpisodes:
+      allOf:
+        -
+          $ref: "#/components/schemas/SeasonSummary"
+        -
+          type: "object"
+          required: ["episodes"]
+          properties:
+            episodes:
+              type: "array"
+              description: "Episodes sorted by episodeNumber in ascending order. Personal isWatched values are not included."
+              items:
+                $ref: "#/components/schemas/Episode"
+    WatchedEpisodeIdsResponse:
+      type: "object"
+      required: ["watchedEpisodesCount"]
+      properties:
+        watchedEpisodesCount:
+          type: "array"
+          description: "Despite the field name, this is an array of watched TMDB episode IDs, not a numeric count."
+          items:
+            type: "integer"
+      example:
+        watchedEpisodesCount: [1001,1002]
+    SearchResponse:
+      type: "object"
+      required: ["results"]
+      properties:
+        page:
+          type: "integer"
+          description: "Current page."
+          example: 1
+        results:
+          type: "array"
+          description: "TV series returned by TMDB."
+          items:
+            $ref: "#/components/schemas/TmdbSearchSeries"
+        total_pages:
+          type: "integer"
+          description: "Total number of result pages."
+          example: 1
+        total_results:
+          type: "integer"
+          description: "Total number of matches."
+          example: 1
+        message:
+          type: "string"
+          description: "Explanation added by the backend for an empty result."
+          enum: ["Search query is required","No results found for your search"]
+      additionalProperties: true
+      description: "TMDB data is forwarded without transformation. For a nonempty query, page, total_pages, and total_results are normally present. A missing query returns only results and message."
+    TmdbSearchSeries:
+      type: "object"
+      additionalProperties: true
+      description: "Raw TMDB search item. The backend does not validate this structure or rename its fields. TMDB may include additional fields."
+      properties:
+        id:
+          type: "integer"
+          description: "TMDB series ID."
+          example: 1396
+        name:
+          type: "string"
+          description: "Title in the requested language."
+          example: "Breaking Bad"
+        original_name:
+          type: "string"
+          description: "Original title."
+        original_language:
+          type: "string"
+          description: "Original language code."
+          example: "en"
+        overview:
+          type: "string"
+          description: "Series overview."
+        poster_path:
+          $ref: "#/components/schemas/ImagePath"
+        backdrop_path:
+          $ref: "#/components/schemas/ImagePath"
+        first_air_date:
+          type: "string"
+          description: "First air date in YYYY-MM-DD format. May be an empty string."
+          example: "2008-01-20"
+        genre_ids:
+          type: "array"
+          description: "TMDB genre IDs."
+          items:
+            type: "integer"
+        origin_country:
+          type: "array"
+          description: "Country-of-origin codes."
+          items:
+            type: "string"
+        popularity:
+          type: "number"
+          description: "TMDB popularity score."
+        vote_average:
+          type: "number"
+          description: "Average TMDB rating."
+        vote_count:
+          type: "integer"
+          description: "Number of ratings."
+        adult:
+          type: "boolean"
+          description: "Adult-content flag."
+    WatchlistIdsResponse:
+      type: "object"
+      required: ["tmdbIds"]
+      properties:
+        tmdbIds:
+          type: "array"
+          description: "TMDB IDs of series in the current user's watchlist."
+          items:
+            type: "integer"
+      example:
+        tmdbIds: [1396,1399]
+    AddSeriesRequest:
+      type: "object"
+      required: ["tmdbId"]
+      properties:
+        tmdbId:
+          type: "integer"
+          description: "TMDB ID of a series that already exists in the database. Must be a JSON number; numeric strings are not coerced."
+          minimum: 1
+          example: 1396
+    AddSeriesResponse:
+      type: "object"
+      required: ["userSeriesId","message"]
+      properties:
+        userSeriesId:
+          type: "string"
+          description: "Currently contains the user's email address, not a numeric record ID."
+          format: "email"
+        message:
+          type: "string"
+          enum: ["series was added successfully"]
+      example:
+        userSeriesId: "viewer@example.com"
+        message: "series was added successfully"
+    WatchlistStatusResponse:
+      oneOf:
+        -
+          type: "object"
+          required: ["seriesId","userStatus"]
+          properties:
+            seriesId:
+              type: "integer"
+              description: "TMDB series ID."
+              example: 1396
+            userStatus:
+              $ref: "#/components/schemas/UserSeriesStatus"
+        -
+          type: "object"
+          required: ["userStatus"]
+          properties:
+            userStatus:
+              type: "string"
+              description: "The series is absent from the user's watchlist."
+              enum: ["none"]
+    UpdateUserStatusRequest:
+      type: "object"
+      required: ["userStatus"]
+      properties:
+        userStatus:
+          $ref: "#/components/schemas/UserSeriesStatus"
+      example:
+        userStatus: "watching"
+    UpdateUserStatusResponse:
+      type: "object"
+      required: ["seriesId","userStatus","message"]
+      properties:
+        seriesId:
+          type: "integer"
+          description: "TMDB series ID."
+          example: 1396
+        userStatus:
+          $ref: "#/components/schemas/UserSeriesStatus"
+        message:
+          type: "string"
+          enum: ["series status was updated successfully"]
+      example:
+        seriesId: 1396
+        userStatus: "watching"
+        message: "series status was updated successfully"
+    WatchlistSeries:
+      type: "object"
+      required: ["tmdbId","title","poster","overview","userStatus"]
+      properties:
+        tmdbId:
+          type: "integer"
+          description: "TMDB series ID."
+          example: 1396
+        title:
+          type: "string"
+          description: "Series title."
+          example: "Breaking Bad"
+        poster:
+          $ref: "#/components/schemas/ImagePath"
+        overview:
+          $ref: "#/components/schemas/NullableOverview"
+        userStatus:
+          $ref: "#/components/schemas/UserSeriesStatus"
+    WatchlistDetailsResponse:
+      type: "object"
+      required: ["series"]
+      properties:
+        series:
+          type: "array"
+          description: "Series cards ordered by date added, newest first."
+          items:
+            $ref: "#/components/schemas/WatchlistSeries"
+

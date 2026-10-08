@@ -3,6 +3,7 @@ import {
   TmdbSeriesSchema,
   SeriesDetailsResponseSchema,
   TmdbSeasonWithEpisodesSchema,
+  type WatchedEpisode,
 } from './series.schema.js';
 import type { Series, Season, Episode } from '../generated/prisma/client.js';
 import {
@@ -32,7 +33,7 @@ export const getOrSyncSeries = async (seriesId: number): Promise<SeriesWithSeaso
 export const getUserSeriesWatchedEpisodes = async (
   userEmail: string,
   seriesId: number
-): Promise<number[]> => {
+): Promise<WatchedEpisode[]> => {
   const watchedEpisodes = await findUserSeriesWatchedEpisodes(userEmail, seriesId);
   return watchedEpisodes;
 };
@@ -54,6 +55,7 @@ export const makeSeriesPayload = (seriesDetails: SeriesWithSeasons) => {
       name: season.name,
       overview: season.overview,
       poster: season.poster,
+      episodeCount: season.episodeCount,
     })),
   };
   return SeriesDetailsResponseSchema.parse(seriesPayload);
