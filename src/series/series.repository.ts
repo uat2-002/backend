@@ -23,6 +23,7 @@ export const findUserSeriesWatchedEpisodes = async (userEmail: string, seriesId:
   if (!watchedRecords || watchedRecords.length === 0) {
     return [];
   }
+
   return watchedRecords.map(record => ({
     episodeId: record.episodeId,
     seasonNumber: record.episode.seasonNumber,
